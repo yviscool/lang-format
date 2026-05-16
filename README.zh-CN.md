@@ -19,6 +19,7 @@
 - 优先读取项目原生配置：`.clang-format`、`pyproject.toml`、`Cargo.toml`、`oxfmt.config.*`
 - 支持安装指引、诊断面板、保存时格式化
 - Python 运行时保持零第三方依赖
+- 兼容 Sublime Text 当前常见的 Python 3.8 到 3.14 运行时
 
 ## 安装
 
@@ -55,6 +56,7 @@
 主要配置项：
 
 - `format_on_save`
+- `format_timeout_ms`
 - `executables`
 - `extra_args`
 - `selector_map`
@@ -80,6 +82,6 @@ python -m pytest
 
 ## 当前限制
 
-- `clang-format` 和 `ruff format` 支持单选区格式化
+- `clang-format` 支持多选区格式化，`ruff format` 支持单选区格式化
 - `gofmt`、`rustfmt`、`oxfmt` 当前只支持整文件格式化
 - `rustfmt` 会根据最近的 `Cargo.toml` 推断 edition，再以 `--emit stdout` 模式运行

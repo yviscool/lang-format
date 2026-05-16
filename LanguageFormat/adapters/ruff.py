@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
@@ -20,7 +20,7 @@ class RuffFormatAdapter(FormatterAdapter):
     docs_url = "https://docs.astral.sh/ruff/formatter/"
     default_extension = ".py"
 
-    def project_binary_relpaths(self) -> tuple[str, ...]:
+    def project_binary_relpaths(self) -> Tuple[str, ...]:
         return (
             ".venv/Scripts/ruff.exe",
             "venv/Scripts/ruff.exe",
@@ -40,7 +40,7 @@ class RuffFormatAdapter(FormatterAdapter):
 
         return None
 
-    def build_command(self, request: FormatRequest, extra_args: tuple[str, ...]) -> list[str]:
+    def build_command(self, request: FormatRequest, extra_args: Tuple[str, ...]) -> List[str]:
         command = [request.executable, "format"]
         if request.stdin_filename:
             command.extend(["--stdin-filename", request.stdin_filename])

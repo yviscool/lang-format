@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import time
+from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 from LanguageFormat.core.contracts import ExecutableDiscovery
 
@@ -16,9 +18,17 @@ except ModuleNotFoundError:
 
 SECTION_RE = re.compile(r"^\s*\[(?P<section>[^\]]+)\]\s*$")
 KEY_VALUE_RE = re.compile(r"^\s*(?P<key>[A-Za-z0-9_-]+)\s*=\s*(?P<value>.+?)\s*$")
+DISCOVERY_CACHE_TTL_SECONDS = 2.0
+DISCOVERY_CACHE_MAXSIZE = 128
+_CACHE_MISS = object()
+_EXECUTABLE_CACHE: Dict[
+    Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...], Optional[str]],
+    Tuple[float, ExecutableDiscovery],
+] = {}
 
 
-def iter_ancestor_dirs(start_dir: Optional[str]) -> tuple[Path, ...]:
+@lru_cache(maxsize=DISCOVERY_CACHE_MAXSIZE)
+def iter_ancestor_dirs(start_dir: Optional[str]) -> Tuple[Path, ...]:
     if not start_dir:
         return ()
 
@@ -28,7 +38,32 @@ def iter_ancestor_dirs(start_dir: Optional[str]) -> tuple[Path, ...]:
     return tuple(dirs)
 
 
-def _normalize_override_entries(value: object) -> tuple[str, ...]:
+def clear_discovery_caches() -> None:
+    iter_ancestor_dirs.cache_clear()
+    _EXECUTABLE_CACHE.clear()
+
+
+def _cache_get(cache: Dict[object, Tuple[float, object]], key: object) -> object:
+    cached = cache.get(key, _CACHE_MISS)
+    if cached is _CACHE_MISS:
+        return _CACHE_MISS
+
+    stored_at, value = cached
+    if time.monotonic() - stored_at > DISCOVERY_CACHE_TTL_SECONDS:
+        cache.pop(key, None)
+        return _CACHE_MISS
+
+    return value
+
+
+def _cache_set(cache: Dict[object, Tuple[float, object]], key: object, value: object) -> object:
+    if len(cache) >= DISCOVERY_CACHE_MAXSIZE:
+        cache.pop(next(iter(cache)))
+    cache[key] = (time.monotonic(), value)
+    return value
+
+
+def _normalize_override_entries(value: object) -> Tuple[str, ...]:
     if isinstance(value, str) and value.strip():
         return (value.strip(),)
     if isinstance(value, (list, tuple)):
@@ -48,8 +83,9 @@ def _maybe_resolve_entry(entry: str, start_dir: Optional[str]) -> str:
 
 
 def _pick_existing_path(candidate: str) -> Optional[str]:
-    if shutil.which(candidate):
-        return shutil.which(candidate)
+    resolved = shutil.which(candidate)
+    if resolved:
+        return resolved
 
     path = Path(candidate)
     if path.is_file():
@@ -57,7 +93,7 @@ def _pick_existing_path(candidate: str) -> Optional[str]:
     return None
 
 
-def _load_toml(path: Union[str, Path]) -> Optional[dict[str, object]]:
+def _load_toml(path: Union[str, Path]) -> Optional[Dict[str, object]]:
     if tomllib is None:
         return None
 
@@ -74,7 +110,7 @@ def _load_toml(path: Union[str, Path]) -> Optional[dict[str, object]]:
 
 def _read_text(path: Union[str, Path]) -> Optional[str]:
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        with open(path, encoding="utf-8", errors="replace") as handle:
             return handle.read()
     except OSError:
         return None
@@ -112,7 +148,7 @@ def _unquote_toml_string(value: str) -> Optional[str]:
     return value[1:-1]
 
 
-def _toml_has_table_fallback(path: Union[str, Path], table_path: tuple[str, ...]) -> bool:
+def _toml_has_table_fallback(path: Union[str, Path], table_path: Tuple[str, ...]) -> bool:
     text = _read_text(path)
     if text is None:
         return False
@@ -132,7 +168,7 @@ def _toml_has_table_fallback(path: Union[str, Path], table_path: tuple[str, ...]
 
 
 def _toml_string_value_fallback(
-    path: Union[str, Path], sections: tuple[str, ...], key: str
+    path: Union[str, Path], sections: Tuple[str, ...], key: str
 ) -> Optional[str]:
     text = _read_text(path)
     if text is None:
@@ -163,39 +199,57 @@ def _toml_string_value_fallback(
     return None
 
 
+def _is_executable_discovery_valid(result: ExecutableDiscovery) -> bool:
+    if result.executable is None:
+        return True
+    return Path(result.executable).is_file()
+
+
 def discover_executable(
     *,
-    binary_names: tuple[str, ...],
-    project_relpaths: tuple[str, ...],
+    binary_names: Tuple[str, ...],
+    project_relpaths: Tuple[str, ...],
     override: object,
     start_dir: Optional[str],
 ) -> ExecutableDiscovery:
-    searched: list[str] = []
+    override_entries = _normalize_override_entries(override)
+    cache_key = (binary_names, project_relpaths, override_entries, start_dir)
+    cached = _cache_get(_EXECUTABLE_CACHE, cache_key)
+    if cached is not _CACHE_MISS and isinstance(cached, ExecutableDiscovery):
+        if _is_executable_discovery_valid(cached):
+            return cached
+        _EXECUTABLE_CACHE.pop(cache_key, None)
 
-    for entry in _normalize_override_entries(override):
+    searched = []
+
+    for entry in override_entries:
         candidate = _maybe_resolve_entry(entry, start_dir)
         searched.append(candidate)
         resolved = _pick_existing_path(candidate)
         if resolved:
-            return ExecutableDiscovery(resolved, "settings", tuple(searched))
+            result = ExecutableDiscovery(resolved, "settings", tuple(searched))
+            return _cache_set(_EXECUTABLE_CACHE, cache_key, result)
 
     for ancestor in iter_ancestor_dirs(start_dir):
         for relpath in project_relpaths:
             candidate = ancestor / relpath
             searched.append(str(candidate))
             if candidate.is_file():
-                return ExecutableDiscovery(str(candidate), "project-local", tuple(searched))
+                result = ExecutableDiscovery(str(candidate), "project-local", tuple(searched))
+                return _cache_set(_EXECUTABLE_CACHE, cache_key, result)
 
     for name in binary_names:
         searched.append(name)
         resolved = shutil.which(name)
         if resolved:
-            return ExecutableDiscovery(resolved, "PATH", tuple(searched))
+            result = ExecutableDiscovery(resolved, "PATH", tuple(searched))
+            return _cache_set(_EXECUTABLE_CACHE, cache_key, result)
 
-    return ExecutableDiscovery(None, None, tuple(searched))
+    result = ExecutableDiscovery(None, None, tuple(searched))
+    return _cache_set(_EXECUTABLE_CACHE, cache_key, result)
 
 
-def find_named_file_upwards(start_dir: Optional[str], names: tuple[str, ...]) -> Optional[str]:
+def find_named_file_upwards(start_dir: Optional[str], names: Tuple[str, ...]) -> Optional[str]:
     for ancestor in iter_ancestor_dirs(start_dir):
         for name in names:
             candidate = ancestor / name
@@ -209,7 +263,7 @@ def pyproject_has_tool_table(pyproject_path: str, *table_path: str) -> bool:
     if not payload:
         return _toml_has_table_fallback(pyproject_path, table_path)
 
-    current: object = payload
+    current = payload  # type: object
     for segment in table_path:
         if not isinstance(current, dict) or segment not in current:
             return False

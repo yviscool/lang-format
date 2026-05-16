@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List, Tuple
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
 
@@ -16,8 +18,8 @@ class GoFormatAdapter(FormatterAdapter):
     def build_command(
         self,
         request: FormatRequest,
-        extra_args: tuple[str, ...],
-    ) -> list[str]:
+        extra_args: Tuple[str, ...],
+    ) -> List[str]:
         command = [request.executable]
         command.extend(extra_args)
         return command

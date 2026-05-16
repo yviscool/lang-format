@@ -3,6 +3,10 @@
     // contents match the formatter output.
     "format_on_save": false,
 
+    // Maximum time to wait for a formatter process in milliseconds.
+    // Use 0 to disable the timeout entirely.
+    "format_timeout_ms": 10000,
+
     // Explicit formatter executable overrides. Each value can be a string or a
     // list of candidate paths/commands.
     //

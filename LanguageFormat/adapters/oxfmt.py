@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List, Tuple
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
 
@@ -43,13 +45,13 @@ class OxcFormatAdapter(FormatterAdapter):
     docs_url = "https://oxc.rs/docs/guide/usage/formatter.html"
     default_extension = ".ts"
 
-    def project_binary_relpaths(self) -> tuple[str, ...]:
+    def project_binary_relpaths(self) -> Tuple[str, ...]:
         return (
             "node_modules/.bin/oxfmt.cmd",
             "node_modules/.bin/oxfmt",
         )
 
-    def build_command(self, request: FormatRequest, extra_args: tuple[str, ...]) -> list[str]:
+    def build_command(self, request: FormatRequest, extra_args: Tuple[str, ...]) -> List[str]:
         command = [request.executable]
         if request.stdin_filename:
             command.extend(["--stdin-filepath", request.stdin_filename])

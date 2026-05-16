@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import platform
 import uuid
+from dataclasses import replace
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import sublime
 import sublime_plugin
@@ -20,10 +21,16 @@ from LanguageFormat.core.discovery import discover_executable
 from LanguageFormat.core.process import run_subprocess
 from LanguageFormat.core.registry import ADAPTERS, selectors_for_adapter
 from LanguageFormat.core.settings import load_runtime_settings
-from LanguageFormat.core.text import clamp_point, detect_newline_style, make_text_range
+from LanguageFormat.core.text import (
+    clamp_point,
+    detect_newline_style,
+    make_text_range,
+    normalize_newlines,
+    remap_selection_regions,
+)
 
 OUTPUT_PANEL_NAME = "language_format"
-PENDING_RESULTS: dict[str, FormatResult] = {}
+PENDING_RESULTS = {}  # type: Dict[str, FormatResult]
 SelectionOffsets = Tuple[Tuple[int, int], ...]
 BuildRequestResult = Tuple[Optional[FormatRequest], Optional[ExecutableDiscovery], Optional[str]]
 
@@ -79,8 +86,8 @@ def _guess_stdin_filename(
 
 def _select_adapter(
     view: sublime.View,
-    selector_map: dict[str, tuple[str, ...]],
-) -> Tuple[Optional[FormatterAdapter], tuple[str, ...]]:
+    selector_map: Dict[str, Tuple[str, ...]],
+) -> Tuple[Optional[FormatterAdapter], Tuple[str, ...]]:
     point = 0
     if view.size() > 0 and len(view.sel()) > 0:
         point = min(view.sel()[0].begin(), view.size() - 1)
@@ -105,14 +112,16 @@ def _format_ranges(
     if mode == "auto" and not non_empty:
         return (), None
 
-    if len(non_empty) != 1:
-        return (), "LanguageFormat: V1 only supports a single non-empty selection."
-
     if not adapter.supports_range:
         return (), f"LanguageFormat: {adapter.display_name} does not support selection formatting."
 
-    region = non_empty[0]
-    return ((region.begin(), region.end()),), None
+    if len(non_empty) > 1 and not adapter.supports_multiple_ranges:
+        return (
+            (),
+            f"LanguageFormat: {adapter.display_name} only supports a single non-empty selection.",
+        )
+
+    return tuple((region.begin(), region.end()) for region in non_empty), None
 
 
 def _build_request(view: sublime.View, mode: str) -> BuildRequestResult:
@@ -154,21 +163,12 @@ def _build_request(view: sublime.View, mode: str) -> BuildRequestResult:
         selection_mode=selection_mode,
         ranges=ranges,
         snapshot=snapshot,
+        timeout_ms=runtime.format_timeout_ms,
+        executable_source=executable_info.source,
     )
     extra_args = runtime.extra_args.get("*", ()) + runtime.extra_args.get(adapter.id, ())
     command = tuple(adapter.build_command(request, extra_args))
-    request = FormatRequest(
-        adapter_id=request.adapter_id,
-        adapter_name=request.adapter_name,
-        executable=request.executable,
-        command=command,
-        cwd=request.cwd,
-        stdin_filename=request.stdin_filename,
-        config_path=request.config_path,
-        selection_mode=request.selection_mode,
-        ranges=request.ranges,
-        snapshot=request.snapshot,
-    )
+    request = replace(request, command=command)
     return request, executable_info, None
 
 
@@ -180,6 +180,7 @@ def _render_diagnostic(
 ) -> str:
     runtime = load_runtime_settings(view)
     adapter, selectors = _select_adapter(view, runtime.selector_map)
+    non_empty = [region for region in view.sel() if not region.empty()]
     lines = [
         "LanguageFormat Diagnose",
         "",
@@ -188,6 +189,7 @@ def _render_diagnostic(
         f"Matched adapter: {adapter.id if adapter else '<none>'}",
         f"Selector candidates: {', '.join(selectors) if selectors else '<none>'}",
         f"Base directory: {_resolve_base_dir(view) or '<none>'}",
+        f"Selections: {len(view.sel())} total / {len(non_empty)} non-empty",
         "",
     ]
 
@@ -195,14 +197,23 @@ def _render_diagnostic(
         lines.extend(
             (
                 f"Executable: {request.executable}",
+                f"Executable source: {request.executable_source or '<unknown>'}",
                 f"Command: {' '.join(request.command)}",
+                f"Working directory: {request.cwd or '<none>'}",
                 f"stdin filename: {request.stdin_filename or '<none>'}",
                 f"Selection mode: {request.selection_mode}",
+                f"Selection ranges: {len(request.ranges)}",
+                f"Timeout: {'disabled' if request.timeout_ms <= 0 else f'{request.timeout_ms} ms'}",
                 f"Config file: {request.config_path or '<none detected>'}",
             )
         )
     elif executable_info and executable_info.executable:
-        lines.append(f"Executable: {executable_info.executable}")
+        lines.extend(
+            (
+                f"Executable: {executable_info.executable}",
+                f"Executable source: {executable_info.source or '<unknown>'}",
+            )
+        )
 
     if executable_info:
         lines.extend(("", "Search log:"))
@@ -239,8 +250,21 @@ def _show_output_panel(window: Optional[sublime.Window], content: str) -> None:
 
 
 def _execute_request(request: FormatRequest) -> FormatResult:
-    returncode, stdout, stderr = run_subprocess(request.command, request.snapshot.text, request.cwd)
-    return FormatResult(request=request, returncode=returncode, stdout=stdout, stderr=stderr)
+    process_result = run_subprocess(
+        request.command,
+        request.snapshot.text,
+        request.cwd,
+        request.timeout_ms,
+    )
+    return FormatResult(
+        request=request,
+        returncode=process_result.returncode,
+        stdout=process_result.stdout,
+        stderr=process_result.stderr,
+        elapsed_ms=process_result.elapsed_ms,
+        timed_out=process_result.timed_out,
+        system_error=process_result.system_error,
+    )
 
 
 def _schedule_apply(view: sublime.View, result: FormatResult) -> None:
@@ -255,6 +279,36 @@ def _run_request_async(view: sublime.View, request: FormatRequest) -> None:
         sublime.set_timeout(lambda: _schedule_apply(view, result))
 
     sublime.set_timeout_async(runner)
+
+
+def _result_message(result: FormatResult) -> str:
+    if result.system_error:
+        return result.system_error
+    if result.stderr.strip():
+        return result.stderr.strip()
+    if result.stdout.strip():
+        return result.stdout.strip()
+    return f"{result.request.adapter_name} exited with code {result.returncode}."
+
+
+def _failure_panel_content(result: FormatResult, message: str) -> str:
+    lines = [
+        f"{result.request.adapter_name} failed",
+        "",
+        f"Command: {' '.join(result.request.command)}",
+        f"Working directory: {result.request.cwd or '<none>'}",
+        f"Executable source: {result.request.executable_source or '<unknown>'}",
+        f"Elapsed: {result.elapsed_ms} ms",
+        "",
+        message,
+    ]
+    stdout = result.stdout.strip()
+    stderr = result.stderr.strip()
+    if stdout:
+        lines.extend(("", "stdout:", stdout))
+    if stderr and stderr != message:
+        lines.extend(("", "stderr:", stderr))
+    return "\n".join(lines)
 
 
 class LanguageFormatCommand(sublime_plugin.TextCommand):
@@ -317,39 +371,30 @@ class LanguageFormatApplyResultCommand(sublime_plugin.TextCommand):
 
         if not result.ok:
             runtime = load_runtime_settings(self.view)
-            message = (
-                result.stderr.strip()
-                or f"{result.request.adapter_name} exited with code {result.returncode}."
-            )
+            message = _result_message(result)
             sublime.status_message(f"LanguageFormat: {message}")
             if runtime.show_output_panel_on_error:
-                _show_output_panel(
-                    self.view.window(),
-                    "\n".join(
-                        (
-                            f"{result.request.adapter_name} failed",
-                            "",
-                            f"Command: {' '.join(result.request.command)}",
-                            f"Working directory: {result.request.cwd or '<none>'}",
-                            "",
-                            message,
-                        )
-                    ),
-                )
+                _show_output_panel(self.view.window(), _failure_panel_content(result, message))
             return
 
-        formatted = result.stdout
+        formatted = normalize_newlines(result.stdout, result.request.snapshot.newline)
         if formatted == result.request.snapshot.text:
             sublime.status_message(
-                f"LanguageFormat: {result.request.adapter_name} made no changes."
+                f"LanguageFormat: {result.request.adapter_name} made no changes "
+                f"({result.elapsed_ms} ms)."
             )
             return
 
+        remapped_regions = remap_selection_regions(
+            result.request.snapshot.text,
+            formatted,
+            result.request.snapshot.selection_regions,
+        )
         self.view.replace(edit, sublime.Region(0, self.view.size()), formatted)
         size = self.view.size()
         selections = [
             sublime.Region(clamp_point(a, size), clamp_point(b, size))
-            for a, b in result.request.snapshot.selection_regions
+            for a, b in remapped_regions
         ]
         self.view.sel().clear()
         for region in selections:
@@ -362,11 +407,16 @@ class LanguageFormatApplyResultCommand(sublime_plugin.TextCommand):
                     (
                         f"{result.request.adapter_name} warnings",
                         "",
+                        f"Elapsed: {result.elapsed_ms} ms",
+                        "",
                         result.stderr.strip(),
                     )
                 ),
             )
-        sublime.status_message(f"LanguageFormat: formatted with {result.request.adapter_name}.")
+        sublime.status_message(
+            f"LanguageFormat: formatted with {result.request.adapter_name} "
+            f"({result.elapsed_ms} ms)."
+        )
 
 
 class LanguageFormatDiagnoseCommand(sublime_plugin.WindowCommand):

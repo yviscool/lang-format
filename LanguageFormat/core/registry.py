@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.adapters.clang import ClangFormatAdapter
@@ -9,7 +9,7 @@ from LanguageFormat.adapters.oxfmt import OxcFormatAdapter
 from LanguageFormat.adapters.ruff import RuffFormatAdapter
 from LanguageFormat.adapters.rust import RustFormatAdapter
 
-ADAPTERS: tuple[FormatterAdapter, ...] = (
+ADAPTERS = (  # type: Tuple[FormatterAdapter, ...]
     ClangFormatAdapter(),
     GoFormatAdapter(),
     RuffFormatAdapter(),
@@ -27,6 +27,6 @@ def adapter_by_id(adapter_id: str) -> Optional[FormatterAdapter]:
 
 def selectors_for_adapter(
     adapter: FormatterAdapter,
-    selector_overrides: dict[str, tuple[str, ...]],
-) -> tuple[str, ...]:
+    selector_overrides: Dict[str, Tuple[str, ...]],
+) -> Tuple[str, ...]:
     return adapter.selectors + tuple(selector_overrides.get(adapter.id, ()))

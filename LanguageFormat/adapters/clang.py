@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List, Tuple
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
 from LanguageFormat.core.text import utf8_byte_offset
@@ -10,12 +12,13 @@ class ClangFormatAdapter(FormatterAdapter):
     display_name = "clang-format"
     selectors = ("source.c", "source.c++", "source.objc", "source.objc++")
     supports_range = True
+    supports_multiple_ranges = True
     binary_names = ("clang-format", "clang-format.exe")
     config_filenames = (".clang-format", "_clang-format")
     docs_url = "https://clang.llvm.org/docs/ClangFormat.html"
     default_extension = ".cpp"
 
-    def build_command(self, request: FormatRequest, extra_args: tuple[str, ...]) -> list[str]:
+    def build_command(self, request: FormatRequest, extra_args: Tuple[str, ...]) -> List[str]:
         command = [request.executable]
         if request.stdin_filename:
             command.extend(["--assume-filename", request.stdin_filename])

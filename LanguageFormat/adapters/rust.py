@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List, Tuple
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
 from LanguageFormat.core.discovery import find_rust_edition
@@ -18,8 +20,8 @@ class RustFormatAdapter(FormatterAdapter):
     def build_command(
         self,
         request: FormatRequest,
-        extra_args: tuple[str, ...],
-    ) -> list[str]:
+        extra_args: Tuple[str, ...],
+    ) -> List[str]:
         command = [request.executable, "--emit", "stdout"]
         edition = find_rust_edition(request.cwd)
         if edition:

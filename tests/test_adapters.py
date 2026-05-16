@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Tuple
 
 from LanguageFormat.adapters.clang import ClangFormatAdapter
 from LanguageFormat.adapters.go import GoFormatAdapter
@@ -14,7 +15,7 @@ def _request(
     adapter_id: str,
     executable: str,
     selection_mode: str,
-    ranges: tuple[TextRange, ...],
+    ranges: Tuple[TextRange, ...],
 ) -> FormatRequest:
     snapshot = ViewSnapshot(
         buffer_id=1,
@@ -58,6 +59,33 @@ def test_clang_command_uses_offset_and_length() -> None:
         "--length",
         "5",
         "--style=file",
+    ]
+
+
+def test_clang_command_supports_multiple_ranges() -> None:
+    request = _request(
+        "clang-format",
+        "clang-format",
+        "selection",
+        (
+            TextRange(0, 5, 1, 1, 1, 6),
+            TextRange(10, 14, 2, 1, 2, 5),
+        ),
+    )
+
+    command = ClangFormatAdapter().build_command(request, ())
+    assert command == [
+        "clang-format",
+        "--assume-filename",
+        "demo.py",
+        "--offset",
+        "0",
+        "--length",
+        "5",
+        "--offset",
+        "10",
+        "--length",
+        "4",
     ]
 
 

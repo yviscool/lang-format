@@ -19,6 +19,7 @@
 - Native project config first: `.clang-format`, `pyproject.toml`, `Cargo.toml`, `oxfmt.config.*`
 - Install guidance, diagnostics panel, and format-on-save support
 - Runtime stays dependency-free on the Python side
+- Python runtime compatibility from Sublime Text's Python 3.8 up through 3.14
 
 ## Install
 
@@ -51,6 +52,7 @@ Default settings live in `LanguageFormat/LanguageFormat.sublime-settings`.
 Primary keys:
 
 - `format_on_save`
+- `format_timeout_ms`
 - `executables`
 - `extra_args`
 - `selector_map`
@@ -76,6 +78,6 @@ python -m pytest
 
 ## Current Limits
 
-- `clang-format` and `ruff format` support single-selection formatting
+- `clang-format` supports multi-selection formatting; `ruff format` supports a single selection
 - `gofmt`, `rustfmt`, and `oxfmt` currently format the whole buffer only
 - `rustfmt` is invoked with `--emit stdout` and tries to infer the edition from the nearest `Cargo.toml`

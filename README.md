@@ -28,6 +28,7 @@
 ## Install
 
 1. Copy `LanguageFormat/` into your Sublime Text `Packages/` directory.
+   Copy the whole package directory, not individual files. If you update the package manually, replace the entire `LanguageFormat/` tree and then reload plugins or restart Sublime Text.
 2. Install the formatter binaries you need:
 
 - C / C++: `winget install LLVM.LLVM`
@@ -45,6 +46,15 @@
 - `LanguageFormat: Install Guide`
 - `LanguageFormat: Create Config For Current File`
 - `LanguageFormat: Create Workspace Configs`
+
+Config generation workflow:
+
+1. Run `LanguageFormat: Create Config For Current File` to generate config files for the active language, or `LanguageFormat: Create Workspace Configs` to scan the whole workspace.
+2. Choose a preset: `Recommended`, `Compact`, or `Wide`.
+3. Choose the target directory. The first option is the plugin's smart project root guess for the current file or workspace.
+4. For Python, choose whether Ruff settings should live in `ruff.toml` or merge into `pyproject.toml`.
+5. Choose how to handle existing files: skip them, replace them, or write `.example` files alongside them.
+6. Review the preview panel and confirm before the plugin writes anything.
 
 Default key bindings:
 
@@ -79,6 +89,7 @@ Generated config files:
 - Python configs can be written to `ruff.toml` or merged into `pyproject.toml`
 - Existing config collisions can be skipped, replaced, or emitted as `.example` files
 - Every run shows a preview panel before writing files
+- After manually updating the package, use `Tools -> Developer -> Reload Plugins` or restart Sublime Text if new commands do not appear immediately
 
 ## Releases
 

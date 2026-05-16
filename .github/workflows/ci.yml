@@ -30,3 +30,81 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Build package asset
+        run: |
+          mkdir -p dist
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import zipfile
+
+          package_root = Path("LanguageFormat")
+          asset = Path("dist/LanguageFormat.sublime-package")
+
+          with zipfile.ZipFile(asset, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(package_root.rglob("*")):
+                  if path.is_dir():
+                      continue
+                  if "__pycache__" in path.parts:
+                      continue
+                  if path.suffix in {".pyc", ".pyo"}:
+                      continue
+                  archive.write(path, path.relative_to(package_root).as_posix())
+
+          digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+          checksum = asset.with_suffix(asset.suffix + ".sha256")
+          checksum.write_text(f"{digest}  {asset.name}\n", encoding="utf-8")
+          PY
+
+      - name: Prepare release metadata
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          tag="edge-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}-${short_sha}"
+          title="Edge ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT} (${short_sha})"
+
+          {
+            echo "RELEASE_TAG=${tag}"
+            echo "RELEASE_TITLE=${title}"
+          } >> "$GITHUB_ENV"
+
+          cat > RELEASE_NOTES.md <<EOF
+          Automated prerelease for commit \`${GITHUB_SHA}\`.
+
+          - Branch: \`${GITHUB_REF_NAME}\`
+          - Commit: \`${GITHUB_SHA}\`
+          - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Assets:
+          - \`LanguageFormat.sublime-package\`
+          - \`LanguageFormat.sublime-package.sha256\`
+          EOF
+
+      - name: Create GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${RELEASE_TAG}" \
+            dist/LanguageFormat.sublime-package \
+            dist/LanguageFormat.sublime-package.sha256 \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "${RELEASE_TITLE}" \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease \
+            --latest=false

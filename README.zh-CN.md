@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-`LanguageFormat` 是一个从零构建的 Sublime Text 4 多语言格式化插件，目标是把主流语言格式化工作流统一到一个包里，优先覆盖 C++、Python、TypeScript、Go 和 Rust。
+`LanguageFormat` 是一个从零构建的 Sublime Text 4 多语言格式化插件，目标很直接：把多种语言的格式化工作流统一到一个包里，优先覆盖 C++、Python、TypeScript、Go 和 Rust。
 
 ## 当前格式化栈
 
@@ -17,13 +17,13 @@
 - 单一命令入口：`LanguageFormat: Format`
 - 按语法作用域自动选择 formatter
 - 优先读取项目原生配置：`.clang-format`、`pyproject.toml`、`Cargo.toml`、`oxfmt.config.*`
-- 支持格式化前保存、诊断面板、安装指引
-- 运行时零第三方 Python 依赖
+- 支持安装指引、诊断面板、保存时格式化
+- Python 运行时保持零第三方依赖
 
 ## 安装
 
 1. 将 `LanguageFormat/` 目录放入 Sublime Text 的 `Packages/` 目录。
-2. 安装对应语言的外部格式化工具：
+2. 安装你需要的外部 formatter：
 
 - C / C++：`winget install LLVM.LLVM`
 - Python：`uv tool install ruff`
@@ -48,17 +48,27 @@
 
 ## 配置
 
-默认配置文件见：
+默认配置文件：
 
 - `LanguageFormat/LanguageFormat.sublime-settings`
 
-常用配置项：
+主要配置项：
 
 - `format_on_save`
 - `executables`
 - `extra_args`
 - `selector_map`
 - `show_output_panel_on_error`
+
+## 发布策略
+
+- CI 会在每次推送到 `main` 时运行
+- 每次成功推送到 `main` 都会自动创建一个 GitHub prerelease
+- 每个 prerelease 会附带：
+  - `LanguageFormat.sublime-package`
+  - `LanguageFormat.sublime-package.sha256`
+
+这样可以保证每个 commit 都有可下载构建，同时又不污染正式语义化版本标签。
 
 ## 开发
 

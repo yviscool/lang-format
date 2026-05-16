@@ -1,0 +1,10 @@
+LanguageFormat installed.
+
+Supported formatter stack:
+- clang-format for C / C++
+- ruff format for Python
+- oxfmt for TypeScript / JavaScript
+- gofmt for Go
+- rustfmt for Rust
+
+Open "LanguageFormat: Install Guide" if a formatter binary is missing.

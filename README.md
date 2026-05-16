@@ -1,8 +1,8 @@
 # LanguageFormat
 
-[简体中文](README.zh-CN.md)
+[中文说明](README.zh-CN.md)
 
-`LanguageFormat` is a from-scratch Sublime Text 4 formatter package designed to unify practical formatting workflows across multiple languages, with first-class support for C++, Python, TypeScript, Go, and Rust.
+`LanguageFormat` is a from-scratch Sublime Text 4 formatter package focused on one practical goal: a single formatter workflow across multiple languages, with first-class support for C++, Python, TypeScript, Go, and Rust.
 
 ## Formatter Stack
 
@@ -18,12 +18,12 @@
 - Scope-based formatter routing
 - Native project config first: `.clang-format`, `pyproject.toml`, `Cargo.toml`, `oxfmt.config.*`
 - Install guidance, diagnostics panel, and format-on-save support
-- Zero third-party Python runtime dependencies inside the plugin
+- Runtime stays dependency-free on the Python side
 
 ## Install
 
 1. Copy `LanguageFormat/` into your Sublime Text `Packages/` directory.
-2. Install the required external formatters for the languages you use:
+2. Install the formatter binaries you need:
 
 - C / C++: `winget install LLVM.LLVM`
 - Python: `uv tool install ruff`
@@ -55,6 +55,16 @@ Primary keys:
 - `extra_args`
 - `selector_map`
 - `show_output_panel_on_error`
+
+## Releases
+
+- CI runs on every push to `main`
+- Every successful push to `main` creates a GitHub prerelease
+- Each prerelease publishes:
+  - `LanguageFormat.sublime-package`
+  - `LanguageFormat.sublime-package.sha256`
+
+This keeps stable semantic tags separate from edge builds while still giving you a downloadable artifact for every commit.
 
 ## Development
 

@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible problem in LanguageFormat
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+        Please include enough detail to reproduce the issue locally.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence description of the problem
+      placeholder: Formatting Python selection fails when...
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Affected language
+      options:
+        - C / C++
+        - Python
+        - TypeScript / JavaScript
+        - Go
+        - Rust
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include file sample, command used, and expected vs actual result
+      placeholder: |
+        1. Open a `.py` file
+        2. Select a block
+        3. Run `LanguageFormat: Format Selection`
+        4. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Sublime build, OS, formatter versions, and plugin settings
+      placeholder: |
+        - Sublime Text:
+        - OS:
+        - clang-format / ruff / rustfmt / gofmt / oxfmt:
+        - Relevant `LanguageFormat` settings:
+    validations:
+      required: true

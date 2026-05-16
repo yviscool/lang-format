@@ -1,0 +1,4 @@
+[
+    { "keys": ["super+alt+f"], "command": "language_format" },
+    { "keys": ["super+alt+shift+f"], "command": "language_format_document" }
+]

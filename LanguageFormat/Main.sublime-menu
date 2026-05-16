@@ -1,0 +1,82 @@
+[
+    {
+        "id": "preferences",
+        "children": [
+            {
+                "caption": "Package Settings",
+                "id": "package-settings",
+                "children": [
+                    {
+                        "caption": "LanguageFormat",
+                        "children": [
+                            {
+                                "caption": "Settings - Default",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/LanguageFormat/LanguageFormat.sublime-settings"
+                                }
+                            },
+                            {
+                                "caption": "Settings - User",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/User/LanguageFormat.sublime-settings"
+                                }
+                            },
+                            { "caption": "-" },
+                            {
+                                "caption": "Key Bindings - Default",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/LanguageFormat/Default (Windows).sublime-keymap",
+                                    "platform": "Windows"
+                                }
+                            },
+                            {
+                                "caption": "Key Bindings - Default",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/LanguageFormat/Default (OSX).sublime-keymap",
+                                    "platform": "OSX"
+                                }
+                            },
+                            {
+                                "caption": "Key Bindings - Default",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/LanguageFormat/Default (Linux).sublime-keymap",
+                                    "platform": "Linux"
+                                }
+                            },
+                            { "caption": "-" },
+                            {
+                                "caption": "Key Bindings - User",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/User/Default (Windows).sublime-keymap",
+                                    "platform": "Windows"
+                                }
+                            },
+                            {
+                                "caption": "Key Bindings - User",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/User/Default (OSX).sublime-keymap",
+                                    "platform": "OSX"
+                                }
+                            },
+                            {
+                                "caption": "Key Bindings - User",
+                                "command": "open_file",
+                                "args": {
+                                    "file": "${packages}/User/Default (Linux).sublime-keymap",
+                                    "platform": "Linux"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+]

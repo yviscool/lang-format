@@ -1,0 +1,44 @@
+{
+    // Format the whole file before save. This runs synchronously so the saved
+    // contents match the formatter output.
+    "format_on_save": false,
+
+    // Explicit formatter executable overrides. Each value can be a string or a
+    // list of candidate paths/commands.
+    //
+    // "executables":
+    // {
+    //     "clang-format": "C:/Program Files/LLVM/bin/clang-format.exe",
+    //     "gofmt": "C:/Program Files/Go/bin/gofmt.exe",
+    //     "ruff": ".venv/Scripts/ruff.exe",
+    //     "rustfmt": "C:/Users/you/.cargo/bin/rustfmt.exe",
+    //     "oxfmt": "node_modules/.bin/oxfmt.cmd"
+    // },
+    "executables": {},
+
+    // Extra CLI flags. Use "*" for global flags and adapter ids for targeted
+    // flags.
+    //
+    // "extra_args":
+    // {
+    //     "*": ["--quiet"],
+    //     "clang-format": ["--fallback-style=none"],
+    //     "gofmt": ["-s"],
+    //     "ruff": ["--line-length", "100"],
+    //     "rustfmt": ["--config", "max_width=100"],
+    //     "oxfmt": ["--config", "oxfmt.config.ts"]
+    // },
+    "extra_args": {},
+
+    // Optional extra selectors to help LanguageFormat recognize custom syntax
+    // packages. Values are appended to the built-in selectors.
+    //
+    // "selector_map":
+    // {
+    //     "oxfmt": ["text.html.handlebars", "text.html.angular"]
+    // },
+    "selector_map": {},
+
+    // Show the output panel with detailed diagnostics when a formatter fails.
+    "show_output_panel_on_error": true
+}

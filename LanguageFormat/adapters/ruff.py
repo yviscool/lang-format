@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.core.contracts import FormatRequest
 from LanguageFormat.core.discovery import (
@@ -26,7 +28,7 @@ class RuffFormatAdapter(FormatterAdapter):
             "venv/bin/ruff",
         )
 
-    def discover_config(self, start_dir: str | None) -> str | None:
+    def discover_config(self, start_dir: Optional[str]) -> Optional[str]:
         direct = find_named_file_upwards(start_dir, (".ruff.toml", "ruff.toml"))
         if direct:
             return direct

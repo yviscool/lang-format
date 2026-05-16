@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Optional
 
 import sublime
 
@@ -42,7 +43,7 @@ def _merge_string_maps(*maps: object) -> dict[str, tuple[str, ...]]:
     return merged
 
 
-def _project_settings(window: sublime.Window | None) -> Mapping[str, object]:
+def _project_settings(window: Optional[sublime.Window]) -> Mapping[str, object]:
     if not window:
         return {}
 

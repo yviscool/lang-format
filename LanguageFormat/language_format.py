@@ -4,6 +4,7 @@ import os
 import platform
 import uuid
 from pathlib import Path
+from typing import Optional, Tuple
 
 import sublime
 import sublime_plugin
@@ -23,11 +24,11 @@ from LanguageFormat.core.text import clamp_point, detect_newline_style, make_tex
 
 OUTPUT_PANEL_NAME = "language_format"
 PENDING_RESULTS: dict[str, FormatResult] = {}
-SelectionOffsets = tuple[tuple[int, int], ...]
-BuildRequestResult = tuple[FormatRequest | None, ExecutableDiscovery | None, str | None]
+SelectionOffsets = Tuple[Tuple[int, int], ...]
+BuildRequestResult = Tuple[Optional[FormatRequest], Optional[ExecutableDiscovery], Optional[str]]
 
 
-def _resolve_base_dir(view: sublime.View) -> str | None:
+def _resolve_base_dir(view: sublime.View) -> Optional[str]:
     file_name = view.file_name()
     if file_name:
         return str(Path(file_name).resolve().parent)
@@ -58,8 +59,8 @@ def _snapshot_view(view: sublime.View) -> ViewSnapshot:
 
 
 def _guess_stdin_filename(
-    view: sublime.View, adapter: FormatterAdapter, base_dir: str | None
-) -> str | None:
+    view: sublime.View, adapter: FormatterAdapter, base_dir: Optional[str]
+) -> Optional[str]:
     if view.file_name():
         return view.file_name()
 
@@ -79,7 +80,7 @@ def _guess_stdin_filename(
 def _select_adapter(
     view: sublime.View,
     selector_map: dict[str, tuple[str, ...]],
-) -> tuple[FormatterAdapter | None, tuple[str, ...]]:
+) -> Tuple[Optional[FormatterAdapter], tuple[str, ...]]:
     point = 0
     if view.size() > 0 and len(view.sel()) > 0:
         point = min(view.sel()[0].begin(), view.size() - 1)
@@ -93,7 +94,7 @@ def _select_adapter(
 
 def _format_ranges(
     view: sublime.View, mode: str, adapter: FormatterAdapter
-) -> tuple[SelectionOffsets, str | None]:
+) -> Tuple[SelectionOffsets, Optional[str]]:
     non_empty = [region for region in view.sel() if not region.empty()]
     if mode == "document":
         return (), None
@@ -173,9 +174,9 @@ def _build_request(view: sublime.View, mode: str) -> BuildRequestResult:
 
 def _render_diagnostic(
     view: sublime.View,
-    request: FormatRequest | None,
-    executable_info: ExecutableDiscovery | None,
-    error: str | None,
+    request: Optional[FormatRequest],
+    executable_info: Optional[ExecutableDiscovery],
+    error: Optional[str],
 ) -> str:
     runtime = load_runtime_settings(view)
     adapter, selectors = _select_adapter(view, runtime.selector_map)
@@ -215,7 +216,7 @@ def _render_diagnostic(
 
 
 def _render_install_guide(
-    adapter: FormatterAdapter, executable_info: ExecutableDiscovery | None
+    adapter: FormatterAdapter, executable_info: Optional[ExecutableDiscovery]
 ) -> str:
     lines = [
         f"LanguageFormat Install Guide: {adapter.display_name}",
@@ -229,7 +230,7 @@ def _render_install_guide(
     return "\n".join(lines)
 
 
-def _show_output_panel(window: sublime.Window | None, content: str) -> None:
+def _show_output_panel(window: Optional[sublime.Window], content: str) -> None:
     if not window:
         return
     panel = window.create_output_panel(OUTPUT_PANEL_NAME)

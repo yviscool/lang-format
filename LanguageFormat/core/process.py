@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+from typing import Optional
 
 
-def run_subprocess(command: tuple[str, ...], text: str, cwd: str | None) -> tuple[int, str, str]:
+def run_subprocess(
+    command: tuple[str, ...], text: str, cwd: Optional[str]
+) -> tuple[int, str, str]:
     startupinfo = None
     if os.name == "nt":
         startupinfo = subprocess.STARTUPINFO()

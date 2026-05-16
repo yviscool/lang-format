@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -18,9 +19,9 @@ class ViewSnapshot:
     buffer_id: int
     change_count: int
     text: str
-    file_name: str | None
-    syntax: str | None
-    base_dir: str | None
+    file_name: Optional[str]
+    syntax: Optional[str]
+    base_dir: Optional[str]
     newline: str
     selection_regions: tuple[tuple[int, int], ...] = ()
 
@@ -36,8 +37,8 @@ class RuntimeSettings:
 
 @dataclass(frozen=True)
 class ExecutableDiscovery:
-    executable: str | None
-    source: str | None
+    executable: Optional[str]
+    source: Optional[str]
     searched: tuple[str, ...] = ()
 
 
@@ -47,9 +48,9 @@ class FormatRequest:
     adapter_name: str
     executable: str
     command: tuple[str, ...]
-    cwd: str | None
-    stdin_filename: str | None
-    config_path: str | None
+    cwd: Optional[str]
+    stdin_filename: Optional[str]
+    config_path: Optional[str]
     selection_mode: str
     ranges: tuple[TextRange, ...]
     snapshot: ViewSnapshot

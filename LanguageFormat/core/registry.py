@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from LanguageFormat.adapters.base import FormatterAdapter
 from LanguageFormat.adapters.clang import ClangFormatAdapter
 from LanguageFormat.adapters.go import GoFormatAdapter
@@ -16,7 +18,7 @@ ADAPTERS: tuple[FormatterAdapter, ...] = (
 )
 
 
-def adapter_by_id(adapter_id: str) -> FormatterAdapter | None:
+def adapter_by_id(adapter_id: str) -> Optional[FormatterAdapter]:
     for adapter in ADAPTERS:
         if adapter.id == adapter_id:
             return adapter

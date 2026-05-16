@@ -17,6 +17,10 @@
 - Single command surface inside Sublime Text
 - Scope-based formatter routing
 - Native project config first: `.clang-format`, `pyproject.toml`, `Cargo.toml`, `oxfmt.config.*`
+- Built-in config generation wizard for current files and whole workspaces
+- Preset selection with `compact`, `recommended`, and `wide` profiles
+- Smart target detection for monorepos, preview before apply, and explicit existing-file handling
+- Optional Ruff config merge into `pyproject.toml`
 - Install guidance, diagnostics panel, and format-on-save support
 - Runtime stays dependency-free on the Python side
 - Python runtime compatibility from Sublime Text's Python 3.8 up through 3.14
@@ -39,6 +43,8 @@
 - `LanguageFormat: Format Selection`
 - `LanguageFormat: Diagnose Current File`
 - `LanguageFormat: Install Guide`
+- `LanguageFormat: Create Config For Current File`
+- `LanguageFormat: Create Workspace Configs`
 
 Default key bindings:
 
@@ -57,6 +63,22 @@ Primary keys:
 - `extra_args`
 - `selector_map`
 - `show_output_panel_on_error`
+
+Recommended workflow:
+
+- Keep editor settings focused on execution (`format_on_save`, `executables`, timeouts)
+- Store style in project-native config files such as `.clang-format`, `pyproject.toml`, `ruff.toml`, `rustfmt.toml`, and `.oxfmtrc.jsonc`
+- Use the built-in config generator commands when a project does not have formatter configs yet
+- Keep `extra_args` for execution details, not for large embedded style definitions
+
+Generated config files:
+
+- The generator walks you through preset selection, target-directory selection, and existing-file handling
+- Current-file generation writes `.editorconfig` plus the formatter config that matches the active syntax
+- Workspace generation writes `.editorconfig` and any formatter configs inferred from supported files already present in the workspace
+- Python configs can be written to `ruff.toml` or merged into `pyproject.toml`
+- Existing config collisions can be skipped, replaced, or emitted as `.example` files
+- Every run shows a preview panel before writing files
 
 ## Releases
 

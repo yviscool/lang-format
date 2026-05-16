@@ -21,6 +21,25 @@ from LanguageFormat.core.discovery import discover_executable
 from LanguageFormat.core.process import run_subprocess
 from LanguageFormat.core.registry import ADAPTERS, selectors_for_adapter
 from LanguageFormat.core.settings import load_runtime_settings
+from LanguageFormat.core.templates import (
+    ExistingHandlingStrategy,
+    GenerationPlan,
+    MaterializedTemplate,
+    TargetCandidate,
+    TemplateFile,
+    TemplatePreset,
+    apply_generation_plan,
+    detect_workspace_languages,
+    existing_strategy_options,
+    openable_paths_from_results,
+    plan_template_generation,
+    preset_options,
+    python_config_options,
+    render_generation_plan,
+    resolve_target_candidates,
+    template_files_for_adapter,
+    template_files_for_workspace,
+)
 from LanguageFormat.core.text import (
     clamp_point,
     detect_newline_style,
@@ -48,6 +67,18 @@ def _resolve_base_dir(view: sublime.View) -> Optional[str]:
         return str(Path(os.getcwd()).resolve())
     except OSError:
         return None
+
+
+def _view_context_dir(view: sublime.View) -> Optional[str]:
+    file_name = view.file_name()
+    if file_name:
+        return str(Path(file_name).resolve().parent)
+
+    window = view.window()
+    if window and window.folders():
+        return str(Path(window.folders()[0]).resolve())
+
+    return None
 
 
 def _snapshot_view(view: sublime.View) -> ViewSnapshot:
@@ -239,6 +270,110 @@ def _render_install_guide(
         for item in executable_info.searched:
             lines.append(f"  {item}")
     return "\n".join(lines)
+
+
+def _open_result_files(
+    window: sublime.Window,
+    results: Tuple[MaterializedTemplate, ...],
+    *,
+    include_existing: bool = False,
+) -> None:
+    for path in openable_paths_from_results(results, include_existing=include_existing):
+        window.open_file(path)
+
+
+def _status_from_materialized(materialized: Tuple[MaterializedTemplate, ...]) -> str:
+    labels = (
+        ("created", "created"),
+        ("replaced", "replaced"),
+        ("merged", "merged"),
+        ("existing", "kept"),
+        ("blocked", "blocked"),
+    )
+    parts = []
+    for status, label in labels:
+        count = sum(1 for item in materialized if item.status == status)
+        if count:
+            parts.append(f"{label} {count}")
+
+    if not parts:
+        return "no config files were generated."
+
+    return ", ".join(parts)
+
+
+def _render_generation_result(
+    plan: GenerationPlan,
+    results: Tuple[MaterializedTemplate, ...],
+) -> str:
+    lines = [render_generation_plan(plan), "", "Applied results:"]
+    for item in results:
+        lines.append(f"  [{item.status.upper()}] {Path(item.path).name}")
+    return "\n".join(lines)
+
+
+def _quick_panel_entries_for_presets(
+    presets: Tuple[TemplatePreset, ...],
+) -> list:
+    entries = []
+    for index, preset in enumerate(presets):
+        caption = preset.caption
+        if index == 0:
+            caption = f"{caption} (Recommended)"
+        entries.append([caption, preset.description])
+    return entries
+
+
+def _quick_panel_entries_for_targets(
+    targets: Tuple[TargetCandidate, ...],
+) -> list:
+    return [
+        [target.caption, f"{target.path} | {target.description}"]
+        for target in targets
+    ]
+
+
+def _quick_panel_entries_for_strategies(
+    strategies: Tuple[ExistingHandlingStrategy, ...],
+) -> list:
+    entries = []
+    for index, strategy in enumerate(strategies):
+        caption = strategy.caption
+        if index == 0:
+            caption = f"{caption} (Recommended)"
+        entries.append([caption, strategy.description])
+    return entries
+
+
+def _quick_panel_entries_for_python_config(options: Tuple[Tuple[str, str, str], ...]) -> list:
+    return [[caption, description] for _config_kind, caption, description in options]
+
+
+def _build_templates_for_selection(
+    *,
+    adapter: Optional[FormatterAdapter],
+    workspace_mode: bool,
+    target: TargetCandidate,
+    preset_id: str,
+    python_config_kind: str,
+) -> Tuple[TemplateFile, ...]:
+    if workspace_mode:
+        return template_files_for_workspace(
+            target.path,
+            preset_id=preset_id,
+            python_config_kind=python_config_kind,
+        )
+    if not adapter:
+        return ()
+    return template_files_for_adapter(
+        adapter.id,
+        preset_id=preset_id,
+        python_config_kind=python_config_kind,
+    )
+
+
+def _workspace_needs_python_choice(target: TargetCandidate) -> bool:
+    return "ruff" in detect_workspace_languages(target.path)
 
 
 def _show_output_panel(window: Optional[sublime.Window], content: str) -> None:
@@ -451,6 +586,171 @@ class LanguageFormatInstallGuideCommand(sublime_plugin.WindowCommand):
             start_dir=_resolve_base_dir(view),
         )
         _show_output_panel(self.window, _render_install_guide(adapter, executable_info))
+
+
+def _run_generation_wizard(
+    window: sublime.Window,
+    *,
+    adapter: Optional[FormatterAdapter],
+    workspace_mode: bool,
+    title: str,
+    context_dir: Optional[str],
+) -> None:
+    targets = resolve_target_candidates(
+        context_dir,
+        window.folders(),
+        adapter_id=adapter.id if adapter else None,
+    )
+    if not targets:
+        sublime.status_message(
+            "LanguageFormat: open a file or workspace folder before generating configs."
+        )
+        return
+
+    presets = preset_options()
+    strategies = existing_strategy_options()
+    state = {
+        "preset": presets[0],
+        "target": targets[0],
+        "python_config_kind": "ruff.toml",
+        "strategy": strategies[0],
+    }
+
+    def show_preset_panel() -> None:
+        window.show_quick_panel(
+            _quick_panel_entries_for_presets(presets),
+            on_preset_selected,
+        )
+
+    def on_preset_selected(index: int) -> None:
+        if index < 0:
+            return
+        state["preset"] = presets[index]
+        window.show_quick_panel(
+            _quick_panel_entries_for_targets(targets),
+            on_target_selected,
+        )
+
+    def on_target_selected(index: int) -> None:
+        if index < 0:
+            return
+        target = targets[index]
+        state["target"] = target
+        if _needs_python_choice(adapter, workspace_mode, target):
+            options = python_config_options(target.path)
+            state["python_options"] = options
+            window.show_quick_panel(
+                _quick_panel_entries_for_python_config(options),
+                on_python_config_selected,
+            )
+            return
+        state["python_config_kind"] = "ruff.toml"
+        show_strategy_panel()
+
+    def on_python_config_selected(index: int) -> None:
+        if index < 0:
+            return
+        options = state.get("python_options", ())
+        if not options:
+            state["python_config_kind"] = "ruff.toml"
+        else:
+            state["python_config_kind"] = options[index][0]
+        show_strategy_panel()
+
+    def show_strategy_panel() -> None:
+        window.show_quick_panel(
+            _quick_panel_entries_for_strategies(strategies),
+            on_strategy_selected,
+        )
+
+    def on_strategy_selected(index: int) -> None:
+        if index < 0:
+            return
+        strategy = strategies[index]
+        state["strategy"] = strategy
+        templates = _build_templates_for_selection(
+            adapter=adapter,
+            workspace_mode=workspace_mode,
+            target=state["target"],
+            preset_id=state["preset"].id,
+            python_config_kind=state["python_config_kind"],
+        )
+        plan = plan_template_generation(
+            title=title,
+            preset_id=state["preset"].id,
+            target=state["target"],
+            existing_strategy_id=strategy.id,
+            templates=templates,
+        )
+        _show_output_panel(window, render_generation_plan(plan))
+        if not sublime.ok_cancel_dialog(
+            "Apply this LanguageFormat config generation plan?",
+            "Apply",
+        ):
+            return
+        _apply_generation_plan(window, plan, include_existing=not workspace_mode)
+
+    show_preset_panel()
+
+
+def _needs_python_choice(
+    adapter: Optional[FormatterAdapter],
+    workspace_mode: bool,
+    target: TargetCandidate,
+) -> bool:
+    return bool(
+        (adapter and adapter.id == "ruff")
+        or (workspace_mode and _workspace_needs_python_choice(target))
+    )
+
+
+def _apply_generation_plan(
+    window: sublime.Window,
+    plan: GenerationPlan,
+    *,
+    include_existing: bool,
+) -> None:
+    results = apply_generation_plan(plan)
+    _open_result_files(window, results, include_existing=include_existing)
+    _show_output_panel(window, _render_generation_result(plan, results))
+    sublime.status_message(
+        f"LanguageFormat: {_status_from_materialized(results)} in {plan.target.path}."
+    )
+
+
+class LanguageFormatCreateConfigCommand(sublime_plugin.WindowCommand):
+    def run(self) -> None:
+        view = self.window.active_view()
+        if not view:
+            sublime.status_message("LanguageFormat: no active view to inspect.")
+            return
+
+        runtime = load_runtime_settings(view)
+        adapter, _selectors = _select_adapter(view, runtime.selector_map)
+        if not adapter:
+            syntax = view.settings().get("syntax") or "unknown syntax"
+            sublime.status_message(f"LanguageFormat: no recommended template for {syntax}.")
+            return
+
+        _run_generation_wizard(
+            self.window,
+            adapter=adapter,
+            workspace_mode=False,
+            title=f"LanguageFormat Config Generator: {adapter.display_name}",
+            context_dir=_view_context_dir(view),
+        )
+
+
+class LanguageFormatCreateWorkspaceConfigsCommand(sublime_plugin.WindowCommand):
+    def run(self) -> None:
+        view = self.window.active_view()
+        _run_generation_wizard(
+            self.window,
+            adapter=None,
+            workspace_mode=True,
+            title="LanguageFormat Workspace Config Generator",
+            context_dir=_view_context_dir(view) if view else None,
+        )
 
 
 class LanguageFormatRenderPanelCommand(sublime_plugin.TextCommand):

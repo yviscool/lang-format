@@ -3,5 +3,13 @@
     { "caption": "LanguageFormat: Format Document", "command": "language_format_document" },
     { "caption": "LanguageFormat: Format Selection", "command": "language_format_selection" },
     { "caption": "LanguageFormat: Diagnose Current File", "command": "language_format_diagnose" },
-    { "caption": "LanguageFormat: Install Guide", "command": "language_format_install_guide" }
+    { "caption": "LanguageFormat: Install Guide", "command": "language_format_install_guide" },
+    {
+        "caption": "LanguageFormat: Create Config For Current File",
+        "command": "language_format_create_config"
+    },
+    {
+        "caption": "LanguageFormat: Create Workspace Configs",
+        "command": "language_format_create_workspace_configs"
+    }
 ]

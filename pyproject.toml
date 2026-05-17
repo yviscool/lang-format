@@ -11,6 +11,10 @@ dev = [
     "ruff>=0.13.2,<0.14",
 ]
 
+[tool.uv]
+default-groups = ["dev"]
+package = false
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
